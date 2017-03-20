@@ -1,5 +1,7 @@
 import asyncio
 
+import bbb.db as db
+
 
 class Reflector:
     """The Reflector is responsible for two things:
@@ -22,11 +24,7 @@ class Reflector:
         pass
 
     async def get_cancelled_build_requests(self, build_request_ids):
-        q = self.bb_db.select([self.buildrequests_table.c.id]).where(
-            self.buildrequests_table.c.id in build_request_ids).where(
-                self.buildrequests_table.c.complete == 1).where(
-                self.buildrequests_table.c.claimed_at == 0)
-        return [r[0] for r in q.fetchall()]
+        return await db.get_cancelled_build_requests(self.bb_db, build_request_ids)
 
     async def schedule_cancelTask(self, task_id, build_request_id):
         # TODO: retry/handle exceptions
