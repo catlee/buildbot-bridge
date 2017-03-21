@@ -62,7 +62,11 @@ setup(
         # eg: 'keyword1', 'keyword2', 'keyword3',
     ],
     install_requires=[
+        'arrow',
         'click',
+        'sqlalchemy',
+        'sqlalchemy_aio',
+        'taskcluster',
     ],
     extras_require={
         # eg:
