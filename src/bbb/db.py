@@ -21,21 +21,24 @@ async def delete_task_by_request_id(id_):
 
 
 async def fetch_all_tasks():
-    return await _bbb_tasks.select().order_by(
-        _bbb_tasks.c.takenUntil.desc()).execute()
+    return await _bbb_conn.execute(_bbb_tasks.select().order_by(
+        _bbb_tasks.c.takenUntil.desc()))
 
 
 async def get_cancelled_build_requests(build_request_ids):
-    q = await _bb_requests.select([_bb_requests.c.id]).where(
-        _bb_requests.c.id in build_request_ids).where(
+    q = _bb_requests.select(_bb_requests.c.id).where(
+        _bb_requests.c.id.in_(build_request_ids)).where(
         _bb_requests.c.complete == 1).where(
-        _bb_requests.c.claimed_at == 0).fetchall()
-    return [r[0] for r in q]
+        _bb_requests.c.claimed_at == 0)
+    res = await _bb_conn.execute(q)
+    records = await res.fetchall()
+    return [r[0] for r in records]
 
 
 async def update_taken_until(request_id, taken_until):
-    await _bbb_tasks.update(_bbb_tasks.c.buildrequestId == request_id).values(
-        takenUntil=taken_until).execute()
+    await _bbb_conn.execute(
+        _bbb_tasks.update(_bbb_tasks.c.buildrequestId == request_id).values(
+            takenUntil=taken_until))
 
 
 def _get_engine(uri):

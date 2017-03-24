@@ -24,15 +24,15 @@ class AsyncTask:
 
     async def reclaim_loop(self):
         # TODO: exception handling:
-        # ignore CancelledError
+        # no need to handle CancelledError
         # retry reclaims unless it's 409
         # retry db operations
         while True:
             reclaim_threshold = 600
             now = arrow.now().timestamp
             next_tick = parse_date(self.task.takenUntil) - reclaim_threshold - now
-            delay = min([next_tick, 0])
-            asyncio.sleep(delay)
+            delay = max([next_tick, 0])
+            await asyncio.sleep(delay)
             res = await self.tc_queue.reclaimTask(self.task.taskId,
                                                   int(self.task.runId))
             self.task.takenUntil = res["takenUntil"]
