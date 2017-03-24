@@ -1,7 +1,7 @@
 import arrow
 import asyncio
 import bbb.db as db
-from taskcluster.async import Queue
+import bbb.taskcluster as tc
 
 
 def parse_date(datestring):
@@ -10,9 +10,8 @@ def parse_date(datestring):
 
 
 class AsyncTask:
-    def __init__(self, task, tc_queue):
+    def __init__(self, task):
         self.task = task
-        self.tc_queue = tc_queue
         self.aio_task = None
 
     def start(self):
@@ -33,11 +32,25 @@ class AsyncTask:
             next_tick = parse_date(self.task.takenUntil) - reclaim_threshold - now
             delay = max([next_tick, 0])
             await asyncio.sleep(delay)
-            res = await self.tc_queue.reclaimTask(self.task.taskId,
-                                                  int(self.task.runId))
+            res = await tc.reclaim_task(self.task.taskId, int(self.task.runId))
             self.task.takenUntil = res["takenUntil"]
             await db.update_taken_until(self.task.buildrequestId,
                                         parse_date(res["takenUntil"]))
+
+
+async def delete_task(task_id, request_id):
+    await tc.cancel_task(task_id)
+    await db.delete_task_by_request_id(request_id)
+
+
+async def process_inactive_tasks(tasks):
+    """Process tasks with no `takenUntil` set."""
+    request_ids = [t.buildrequestId for t in tasks]
+    cancelled = await db.get_cancelled_build_requests(request_ids)
+    cancelled_tasks = [t for t in tasks if t.buildRequestId in cancelled]
+    await asyncio.wait(
+        [delete_task(task_id=t.taskId, request_id=t.buildRequestId)
+         for t in cancelled_tasks])
 
 
 class Reflector:
@@ -46,27 +59,10 @@ class Reflector:
            Cancelling tasks that were running is handled by the BB listener
         2) Reclaiming active tasks
     """
-    def __init__(self, tc_config):
+    def __init__(self):
         # Mapping of task id to a kind of future handle that is in charge of
         # reclaiming this task
         self.active_tasks = []
-        self.tc_queue = Queue(tc_config)
-
-    async def get_cancelled_build_requests(self, build_request_ids):
-        return await db.get_cancelled_build_requests(build_request_ids)
-
-    async def delete_task(self, task_id, request_id):
-        await self.tc_queue.cancelTask(task_id)
-        await db.delete_task_by_request_id(request_id)
-
-    async def process_inactive_tasks(self, tasks):
-        """Process tasks with no `takenUntil` set."""
-        request_ids = [t.buildrequestId for t in tasks]
-        cancelled = await db.get_cancelled_build_requests(request_ids)
-        cancelled_tasks = [t for t in tasks if t.buildRequestId in cancelled]
-        await asyncio.wait(
-            [self.delete_task(task_id=t.taskId, request_id=t.buildRequestId)
-             for t in cancelled_tasks])
 
     async def main_loop(self):
         all_tasks = await db.fetch_all_tasks()
@@ -75,7 +71,7 @@ class Reflector:
         finished_tasks = [t for t in self.active_tasks if t not in actionable]
         new_tasks = [t for t in actionable if t not in self.active_tasks]
         await asyncio.wait([
-            self.process_inactive_tasks(inactive_tasks),
+            process_inactive_tasks(inactive_tasks),
             self.remove_finished_tasks(finished_tasks),
             self.add_new_tasks(new_tasks)
         ])
@@ -89,6 +85,6 @@ class Reflector:
 
     async def add_new_tasks(self, new_tasks):
         for t in new_tasks:
-            task = AsyncTask(t, self.tc_queue)
+            task = AsyncTask(t)
             task.start()
             self.active_tasks.append(task)
