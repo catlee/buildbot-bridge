@@ -1,4 +1,3 @@
-import sqlalchemy as sa
 from sqlalchemy.schema import CreateTable
 import bbb.db
 
