@@ -21,8 +21,9 @@ async def delete_task_by_request_id(id_):
 
 
 async def fetch_all_tasks():
-    return await _bbb_conn.execute(_bbb_tasks.select().order_by(
+    res = await _bbb_conn.execute(_bbb_tasks.select().order_by(
         _bbb_tasks.c.takenUntil.desc()))
+    return await res.fetchall()
 
 
 async def get_cancelled_build_requests(build_request_ids):
