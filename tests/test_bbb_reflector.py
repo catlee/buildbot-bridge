@@ -4,7 +4,7 @@ from pytest import fixture
 
 @fixture
 def r():
-    return Reflector({})
+    return Reflector()
 
 
 def test_add_new_tasks(r):
