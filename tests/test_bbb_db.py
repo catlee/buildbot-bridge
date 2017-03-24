@@ -4,20 +4,19 @@ from .dbutils import create_dbs
 import sqlalchemy as sa
 
 
-@pytest.mark.asyncio
-async def test_init():
-    await bbb.db.init("sqlite:///:memory:", "sqlite:///:memory:")
+def test_init():
+    bbb.db.init("sqlite:///:memory:", "sqlite:///:memory:")
     assert bbb.db._bbb_tasks is not None
     assert bbb.db._bb_requests is not None
-    assert bbb.db._bb_conn  is not None
-    assert bbb.db._bbb_conn is not None
+    assert bbb.db._bb_db  is not None
+    assert bbb.db._bbb_db is not None
 
 
 @pytest.mark.asyncio
 async def test_delete_task_by_request_id():
-    await bbb.db.init("sqlite:///:memory:", "sqlite:///:memory:")
+    bbb.db.init("sqlite:///:memory:", "sqlite:///:memory:")
     await create_dbs()
-    await bbb.db._bbb_conn.execute(
+    await bbb.db._bbb_db.execute(
         bbb.db._bbb_tasks.insert().values(
             buildrequestId=1,
             taskId="a",
@@ -25,7 +24,7 @@ async def test_delete_task_by_request_id():
             createdDate=12,
             processedDate=17,
             takenUntil=200))
-    await bbb.db._bbb_conn.execute(
+    await bbb.db._bbb_db.execute(
         bbb.db._bbb_tasks.insert().values(
             buildrequestId=2,
             taskId="ab",
@@ -40,9 +39,9 @@ async def test_delete_task_by_request_id():
 
 @pytest.mark.asyncio
 async def test_fetch_all_tasks():
-    await bbb.db.init("sqlite:///:memory:", "sqlite:///:memory:")
+    bbb.db.init("sqlite:///:memory:", "sqlite:///:memory:")
     await create_dbs()
-    await bbb.db._bbb_conn.execute(
+    await bbb.db._bbb_db.execute(
         bbb.db._bbb_tasks.insert().values(
             buildrequestId=1,
             taskId="a",
@@ -50,7 +49,7 @@ async def test_fetch_all_tasks():
             createdDate=12,
             processedDate=17,
             takenUntil=200))
-    await bbb.db._bbb_conn.execute(
+    await bbb.db._bbb_db.execute(
         bbb.db._bbb_tasks.insert().values(
             buildrequestId=2,
             taskId="ab",
@@ -64,24 +63,24 @@ async def test_fetch_all_tasks():
 
 @pytest.mark.asyncio
 async def test_get_cancelled_build_requests():
-    await bbb.db.init("sqlite:///:memory:", "sqlite:///:memory:")
+    bbb.db.init("sqlite:///:memory:", "sqlite:///:memory:")
     await create_dbs()
-    await bbb.db._bb_conn.execute(
+    await bbb.db._bb_db.execute(
         bbb.db._bb_requests.insert().values(
             id=1,
             complete=1,
             claimed_at=0))
-    await bbb.db._bb_conn.execute(
+    await bbb.db._bb_db.execute(
         bbb.db._bb_requests.insert().values(
             id=2,
             complete=1,
             claimed_at=5))
-    await bbb.db._bb_conn.execute(
+    await bbb.db._bb_db.execute(
         bbb.db._bb_requests.insert().values(
             id=3,
             complete=0,
             claimed_at=0))
-    await bbb.db._bb_conn.execute(
+    await bbb.db._bb_db.execute(
         bbb.db._bb_requests.insert().values(
             id=4,
             complete=1,
@@ -92,9 +91,9 @@ async def test_get_cancelled_build_requests():
 
 @pytest.mark.asyncio
 async def test_update_taken_until():
-    await bbb.db.init("sqlite:///:memory:", "sqlite:///:memory:")
+    bbb.db.init("sqlite:///:memory:", "sqlite:///:memory:")
     await create_dbs()
-    await bbb.db._bbb_conn.execute(
+    await bbb.db._bbb_db.execute(
         bbb.db._bbb_tasks.insert().values(
             buildrequestId=1,
             taskId="xx",
@@ -103,7 +102,7 @@ async def test_update_taken_until():
             processedDate=17,
             takenUntil=200))
     await bbb.db.update_taken_until(1, 1)
-    res = await bbb.db._bbb_conn.execute(
+    res = await bbb.db._bbb_db.execute(
         sa.select([bbb.db._bbb_tasks.c.takenUntil]).where(
             bbb.db._bbb_tasks.c.buildrequestId == 1
         )

@@ -3,25 +3,24 @@ import sqlalchemy as sa
 
 _bbb_tasks = None
 _bb_requests = None
-_bb_conn = None
-_bbb_conn = None
+_bb_db = None
+_bbb_db = None
 
-async def init(bridge_uri, buildbot_uri):
-    global _bbb_tasks, _bb_requests, _bb_conn, _bbb_conn
+
+def init(bridge_uri, buildbot_uri):
+    global _bbb_tasks, _bb_requests, _bb_db, _bbb_db
     _bbb_db = _get_engine(bridge_uri)
     _bb_db = _get_engine(buildbot_uri)
     _bbb_tasks = _get_bbb_tasks_table(_bbb_db)
     _bb_requests = _get_bb_requests_table(_bb_db)
-    _bb_conn = await _bb_db.connect()
-    _bbb_conn = await _bbb_db.connect()
 
 
 async def delete_task_by_request_id(id_):
-    await _bbb_conn.execute(_bbb_tasks.delete(_bbb_tasks.c.buildrequestId == id_))
+    await _bbb_db.execute(_bbb_tasks.delete(_bbb_tasks.c.buildrequestId == id_))
 
 
 async def fetch_all_tasks():
-    res = await _bbb_conn.execute(_bbb_tasks.select().order_by(
+    res = await _bbb_db.execute(_bbb_tasks.select().order_by(
         _bbb_tasks.c.takenUntil.desc()))
     return await res.fetchall()
 
@@ -31,13 +30,13 @@ async def get_cancelled_build_requests(build_request_ids):
         _bb_requests.c.id.in_(build_request_ids)).where(
         _bb_requests.c.complete == 1).where(
         _bb_requests.c.claimed_at == 0)
-    res = await _bb_conn.execute(q)
+    res = await _bb_db.execute(q)
     records = await res.fetchall()
     return [r[0] for r in records]
 
 
 async def update_taken_until(request_id, taken_until):
-    await _bbb_conn.execute(
+    await _bbb_db.execute(
         _bbb_tasks.update(_bbb_tasks.c.buildrequestId == request_id).values(
             takenUntil=taken_until))
 
