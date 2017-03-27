@@ -1,8 +1,11 @@
 import asyncio
 import arrow
+import logging
 
 import bbb.db as db
 import bbb.taskcluster as tc
+
+log = logging.getLogger(__name__)
 
 
 def parse_date(datestring):
@@ -16,10 +19,14 @@ class AsyncTask:
         self.aio_task = None
 
     def start(self):
+        log.info("Start watching task: %s run: %s", self.task.taskId,
+                 self.task.runId)
         loop = asyncio.get_event_loop()
         self.aio_task = loop.create_task(self.reclaim_loop())
 
     def cancel(self):
+        log.info("Stop watching task: %s run: %s", self.task.taskId,
+                 self.task.runId)
         self.aio_task.cancel()
 
     async def reclaim_loop(self):
@@ -32,15 +39,23 @@ class AsyncTask:
             now = arrow.now().timestamp
             next_tick = parse_date(self.task.takenUntil) - reclaim_threshold - now
             delay = max([next_tick, 0])
+            log.info("Will reclaim task: %s run:%s in %s seconds",
+                     self.task.taskId, self.task.runId, delay)
             await asyncio.sleep(delay)
+            log.info("Reclaim task: %s run:%s ", self.task.taskId,
+                     self.task.runId)
             res = await tc.reclaim_task(self.task.taskId, int(self.task.runId))
             self.task.takenUntil = res["takenUntil"]
+            log.info("Update takenUntil of task: %s run:%s to %s",
+                     self.task.taskId, self.task.runId, res["takenUntil"])
             await db.update_taken_until(self.task.buildrequestId,
                                         parse_date(res["takenUntil"]))
 
 
 async def delete_task(task_id, request_id):
+    log.info("Cancelling task: %s", task_id)
     await tc.cancel_task(task_id)
+    log.info("Removing from DB, task: %s, requestid: %s", task_id, request_id)
     await db.delete_task_by_request_id(request_id)
 
 
@@ -49,9 +64,13 @@ async def process_inactive_tasks(tasks):
     request_ids = [t.buildrequestId for t in tasks]
     cancelled = await db.get_cancelled_build_requests(request_ids)
     cancelled_tasks = [t for t in tasks if t.buildRequestId in cancelled]
-    await asyncio.wait(
-        [delete_task(task_id=t.taskId, request_id=t.buildRequestId)
-         for t in cancelled_tasks])
+    if cancelled_tasks:
+        log.info("Found cancelled-before-started tasks: %s",
+                 ", ".join(t.taskId for t in cancelled_tasks))
+        await asyncio.wait([
+            delete_task(task_id=t.taskId, request_id=t.buildRequestId)
+            for t in cancelled_tasks
+        ])
 
 
 class Reflector:
