@@ -5,14 +5,24 @@ _bbb_tasks = None
 _bb_requests = None
 _bb_db = None
 _bbb_db = None
+_bb_sourcestamps = None
+_bb_buildsets = None
+_bb_builds = None
 
 
 def init(bridge_uri, buildbot_uri):
-    global _bbb_tasks, _bb_requests, _bb_db, _bbb_db
+    global _bbb_tasks, _bb_requests, _bb_db, _bbb_db, _bb_sourcestamps, \
+        _bb_buildsets, _bb_builds
+
     _bbb_db = _get_engine(bridge_uri)
     _bb_db = _get_engine(buildbot_uri)
+
     _bbb_tasks = _get_bbb_tasks_table(_bbb_db)
+
     _bb_requests = _get_bb_requests_table(_bb_db)
+    _bb_sourcestamps = _get_bb_sourcestamps_table(_bb_db)
+    _bb_buildsets = _get_bb_buildsets_table(_bb_db)
+    _bb_builds = _get_bb_builds_table(_bb_db)
 
 
 async def delete_task_by_request_id(id_):
@@ -39,6 +49,28 @@ async def update_taken_until(request_id, taken_until):
     await _bbb_db.execute(
         _bbb_tasks.update(_bbb_tasks.c.buildrequestId == request_id).values(
             takenUntil=taken_until))
+
+
+async def get_branch(request_id):
+    q = sa.select([_bb_sourcestamps.c.branch]).where(
+        _bb_sourcestamps.c.id == _bb_buildsets.c.sourcestampid).where(
+        _bb_buildsets.c.id == _bb_requests.c.buildsetid).where(
+        _bb_requests.c.id == request_id)
+    res = await _bb_db.execute(q)
+    records = await res.first()
+    return records[0]
+
+
+async def get_build_id(request_id):
+    q = sa.select([_bb_builds.c.id]).where(_bb_builds.c.brid == request_id)
+    res = await _bb_db.execute(q)
+    return await res.first()
+
+
+async def get_build_request(request_id):
+    q = sa.select([_bb_requests]).where(_bb_requests.c.id == request_id)
+    res = await _bb_db.execute(q)
+    return await res.first()
 
 
 def _get_engine(uri):
@@ -81,4 +113,44 @@ def _get_bb_requests_table(engine):
         sa.Column('results', sa.Integer),
         sa.Column('submitted_at', sa.Integer),
         sa.Column('complete_at', sa.Integer)
+    )
+
+
+def _get_bb_sourcestamps_table(engine):
+    return sa.Table(
+        'sourcestamps',
+        sa.MetaData(engine),
+        sa.Column('id', sa.Integer, primary_key=True),
+        sa.Column('branch', sa.String(256)),
+        sa.Column('revision', sa.String(256)),
+        sa.Column('patchid', sa.Integer),
+        sa.Column('repository', sa.String),
+        sa.Column('project', sa.String)
+    )
+
+
+def _get_bb_buildsets_table(engine):
+    return sa.Table(
+        'buildsets',
+        sa.MetaData(engine),
+        sa.Column('id', sa.Integer, primary_key=True),
+        sa.Column('external_idstring', sa.String(256)),
+        sa.Column('reason', sa.String(256)),
+        sa.Column('sourcestampid', sa.Integer),
+        sa.Column('submitted_at', sa.Integer),
+        sa.Column('complete', sa.Integer),
+        sa.Column('complete_at', sa.Integer),
+        sa.Column('results', sa.Integer),
+    )
+
+
+def _get_bb_builds_table(engine):
+    return sa.Table(
+        'builds',
+        sa.MetaData(engine),
+        sa.Column('id', sa.Integer, primary_key=True),
+        sa.Column('number', sa.Integer),
+        sa.Column('brid', sa.Integer),
+        sa.Column('start_time', sa.Integer),
+        sa.Column('finish_time', sa.Integer),
     )

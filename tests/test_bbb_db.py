@@ -11,6 +11,9 @@ def test_init():
     assert bbb.db._bb_requests is not None
     assert bbb.db._bb_db  is not None
     assert bbb.db._bbb_db is not None
+    assert bbb.db._bb_sourcestamps is not None
+    assert bbb.db._bb_buildsets is not None
+    assert bbb.db._bb_builds is not None
 
 
 @pytest.mark.asyncio
@@ -110,3 +113,17 @@ async def test_update_taken_until():
     )
     records = await res.fetchall()
     assert records[0][0] == 1
+
+
+@pytest.mark.asyncio
+async def test_get_branch():
+    bbb.db.init("sqlite:///:memory:", "sqlite:///:memory:")
+    await create_dbs()
+    await bbb.db._bb_db.execute(bbb.db._bb_requests.insert().values(
+        id=1, buildsetid=2))
+    await bbb.db._bb_db.execute(bbb.db._bb_sourcestamps.insert().values(
+        id=10, branch="foo"))
+    await bbb.db._bb_db.execute(bbb.db._bb_buildsets.insert().values(
+        id=2, sourcestampid=10))
+    branch = await bbb.db.get_branch(1)
+    assert branch == "foo"

@@ -45,7 +45,8 @@ class AsyncTask:
             await asyncio.sleep(delay)
             log.info("Reclaim task: %s run:%s ", self.task.taskId,
                      self.task.runId)
-            res = await tc.reclaim_task(self.task.taskId, int(self.task.runId))
+            res = await tc.reclaim_task(self.task.taskId, int(self.task.runId),
+                                        self.task.buildrequestId)
             self.task.takenUntil = res["takenUntil"]
             log.info("Update takenUntil of task: %s run:%s to %s",
                      self.task.taskId, self.task.runId, res["takenUntil"])
