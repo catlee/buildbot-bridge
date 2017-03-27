@@ -1,6 +1,6 @@
 from sqlalchemy.schema import CreateTable
-import bbb.db
 
+import bbb.db
 
 async def make_bbb_db():
     await bbb.db._bbb_db.execute(CreateTable(bbb.db._bbb_tasks))

@@ -1,5 +1,6 @@
-import arrow
 import asyncio
+import arrow
+
 import bbb.db as db
 import bbb.taskcluster as tc
 

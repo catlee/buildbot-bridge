@@ -1,5 +1,6 @@
-from bbb.reflector import Reflector
 from pytest import fixture
+
+from bbb.reflector import Reflector
 
 
 @fixture

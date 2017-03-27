@@ -14,4 +14,3 @@ async def reclaim_task(task_id, run_id):
 
 async def cancel_task(task_id):
     _queue.cancelTask(task_id)
-

@@ -1,7 +1,8 @@
-import bbb.db
 import pytest
-from .dbutils import create_dbs
 import sqlalchemy as sa
+
+import bbb.db
+from .dbutils import create_dbs
 
 
 def test_init():
