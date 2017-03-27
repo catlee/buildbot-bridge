@@ -8,7 +8,7 @@ little bit helps, and credit will always be given.
 Bug reports
 ===========
 
-When `reporting a bug <https://github.com/catlee/buildbot-bridge/issues>`_ please include:
+When `reporting a bug <https://github.com/mozilla-releng/buildbot-bridge/issues>`_ please include:
 
     * Your operating system name and version.
     * Any details about your local setup that might be helpful in troubleshooting.
@@ -24,7 +24,8 @@ articles, and such.
 Feature requests and feedback
 =============================
 
-The best way to send feedback is to file an issue at https://github.com/catlee/buildbot-bridge/issues.
+The best way to send feedback is to file an issue at 
+https://github.com/mozilla-releng/buildbot-bridge/issues.
 
 If you are proposing a feature:
 
@@ -37,7 +38,7 @@ Development
 
 To set up `buildbot-bridge` for local development:
 
-1. Fork `buildbot-bridge <https://github.com/catlee/buildbot-bridge>`_
+1. Fork `buildbot-bridge <https://github.com/mozilla-releng/buildbot-bridge>`_
    (look for the "Fork" button).
 2. Clone your fork locally::
 
@@ -74,7 +75,7 @@ For merging, you should:
 4. Add yourself to ``AUTHORS.rst``.
 
 .. [1] If you don't have all the necessary python versions available locally you can rely on Travis - it will
-       `run the tests <https://travis-ci.org/catlee/buildbot-bridge/pull_requests>`_ for each change you add in the pull request.
+       `run the tests <https://travis-ci.org/mozilla-releng/buildbot-bridge/pull_requests>`_ for each change you add in the pull request.
 
        It will be slower though ...
 

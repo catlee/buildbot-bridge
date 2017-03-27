@@ -31,14 +31,14 @@ version = release = u'2.0.0'
 pygments_style = 'trac'
 templates_path = ['.']
 extlinks = {
-    'issue': ('https://github.com/catlee/buildbot-bridge/issues/%s', '#'),
-    'pr': ('https://github.com/catlee/buildbot-bridge/pull/%s', 'PR #'),
+    'issue': ('https://github.com/mozilla-releng/buildbot-bridge/issues/%s', '#'),
+    'pr': ('https://github.com/mozilla-releng/buildbot-bridge/pull/%s', 'PR #'),
 }
 import sphinx_py3doc_enhanced_theme
 html_theme = "sphinx_py3doc_enhanced_theme"
 html_theme_path = [sphinx_py3doc_enhanced_theme.get_html_theme_path()]
 html_theme_options = {
-    'githuburl': 'https://github.com/catlee/buildbot-bridge/'
+    'githuburl': 'https://github.com/mozilla-releng/buildbot-bridge/'
 }
 
 html_use_smartypants = True
