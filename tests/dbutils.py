@@ -1,3 +1,4 @@
+import asyncio
 from sqlalchemy.schema import CreateTable
 
 import bbb.db
@@ -11,5 +12,4 @@ async def make_bb_db():
 
 
 async def create_dbs():
-    await make_bb_db()
-    await make_bbb_db()
+    await asyncio.wait([make_bb_db(), make_bbb_db()])
