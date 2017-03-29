@@ -36,8 +36,12 @@ async def reclaim_task(task_id, run_id, request_id):
             await db.delete_task_by_request_id(request_id)
 
         elif status_code == 409:
-            complete = db.get_build_request(request_id)['complete']
-            if not complete:
+            job_complete = await db.get_build_request(request_id)['complete']
+            if job_complete:
+                log.info("task %s: run %s: buildrequest %s: got 409 when "
+                         "reclaiming task; assuming task is complete",
+                         task_id, run_id, request_id)
+            else:
                 log.warning(
                     "task %s: run %s: deadline exceeded; cancelling it",
                     task_id, run_id)
@@ -52,10 +56,6 @@ async def reclaim_task(task_id, run_id, request_id):
                     log.exception("task %s: run %s: buildrequest %s: failed "
                                   "to cancel task", task_id, run_id,
                                   request_id)
-            else:
-                log.info("task %s: run %s: buildrequest %s: got 409 when "
-                         "reclaiming task; assuming task is complete",
-                         task_id, run_id, request_id)
 
         else:
             log.warning("task %s: run %s: Unhandled TC status code %s",

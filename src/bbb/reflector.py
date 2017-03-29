@@ -31,12 +31,9 @@ class AsyncTask:
         self.aio_task.cancel()
 
     async def reclaim_loop(self):
-        # TODO: exception handling:
-        # no need to handle CancelledError
-        # retry reclaims unless it's 409
         # retry db operations
         while True:
-            reclaim_threshold = 600
+            reclaim_threshold = 600  # TODO: move to config
             now = arrow.now().timestamp
             next_tick = parse_date(self.task.takenUntil) - reclaim_threshold - now
             delay = max([next_tick, 0])
