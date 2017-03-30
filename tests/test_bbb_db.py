@@ -122,8 +122,8 @@ async def test_get_branch():
     await bbb.db._bb_db.execute(bbb.db._bb_requests.insert().values(
         id=1, buildsetid=2))
     await bbb.db._bb_db.execute(bbb.db._bb_sourcestamps.insert().values(
-        id=10, branch="foo"))
+        id=10, branch="foo/bar"))
     await bbb.db._bb_db.execute(bbb.db._bb_buildsets.insert().values(
         id=2, sourcestampid=10))
     branch = await bbb.db.get_branch(1)
-    assert branch == "foo"
+    assert branch == "bar"

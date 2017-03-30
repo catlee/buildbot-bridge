@@ -18,7 +18,7 @@ def init(options):
 async def reclaim_task(task_id, run_id, request_id):
 
     try:
-        await _queue.reclaimTask(task_id, run_id)
+        return await _queue.reclaimTask(task_id, run_id)
 
     except TaskclusterRestFailure as e:
         status_code = e.superExc.response.status_code
@@ -63,4 +63,8 @@ async def reclaim_task(task_id, run_id, request_id):
 
 
 async def cancel_task(task_id):
-    _queue.cancelTask(task_id)
+    try:
+        await _queue.cancelTask(task_id)
+    except TaskclusterRestFailure as e:
+        log.error("task %s:  status_code: %s body: %s", task_id, e.status_code,
+                  e.body)

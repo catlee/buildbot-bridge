@@ -6,6 +6,8 @@ import arrow
 import bbb.db as db
 import bbb.taskcluster as tc
 
+_reflected_tasks = dict()
+RECLAIM_THRESHOLD = 10 * 60
 log = logging.getLogger(__name__)
 
 
@@ -14,52 +16,115 @@ def parse_date(datestring):
     return arrow.get(datestring).timestamp
 
 
-class AsyncTask:
-    def __init__(self, task):
-        self.task = task
-        self.aio_task = None
+class ReflectedTask:
+    def __init__(self, bbb_task):
+        self.bbb_task = bbb_task
+        self.future = None
 
     def start(self):
-        log.info("Start watching task: %s run: %s", self.task.taskId,
-                 self.task.runId)
+        log.info("Start watching task: %s run: %s", self.bbb_task.taskId,
+                 self.bbb_task.runId)
         loop = asyncio.get_event_loop()
-        self.aio_task = loop.create_task(self.reclaim_loop())
+        self.future = loop.create_task(self.reclaim_loop())
 
     def cancel(self):
-        log.info("Stop watching task: %s run: %s", self.task.taskId,
-                 self.task.runId)
-        self.aio_task.cancel()
+        log.info("Stop watching task: %s run: %s", self.bbb_task.taskId,
+                 self.bbb_task.runId)
+        self.future.cancel()
 
     async def reclaim_loop(self):
-        # retry db operations
         while True:
-            reclaim_threshold = 600  # TODO: move to config
             now = arrow.now().timestamp
-            next_tick = parse_date(self.task.takenUntil) - reclaim_threshold - now
-            delay = max([next_tick, 0])
-            log.info("Will reclaim task: %s run:%s in %s seconds",
-                     self.task.taskId, self.task.runId, delay)
-            await asyncio.sleep(delay)
-            log.info("Reclaim task: %s run:%s ", self.task.taskId,
-                     self.task.runId)
-            res = await tc.reclaim_task(self.task.taskId, int(self.task.runId),
-                                        self.task.buildrequestId)
-            self.task.takenUntil = res["takenUntil"]
-            log.info("Update takenUntil of task: %s run:%s to %s",
-                     self.task.taskId, self.task.runId, res["takenUntil"])
-            await db.update_taken_until(self.task.buildrequestId,
-                                        parse_date(res["takenUntil"]))
+            taken_until = arrow.get(self.bbb_task.takenUntil).timestamp
+            reclaim_at = taken_until - RECLAIM_THRESHOLD
+            if now >= reclaim_at:
+                log.info("Reclaim task: %s run:%s ", self.bbb_task.taskId,
+                         self.bbb_task.runId)
+                res = await tc.reclaim_task(
+                    self.bbb_task.taskId,
+                    int(self.bbb_task.runId),
+                    self.bbb_task.buildrequestId)
+                if res:
+                    self.bbb_task.takenUntil = res["takenUntil"]
+                    log.info("Update takenUntil of task: %s run:%s to %s",
+                             self.bbb_task.taskId, self.bbb_task.runId,
+                             res["takenUntil"])
+                    await db.update_taken_until(self.bbb_task.buildrequestId,
+                                                parse_date(res["takenUntil"]))
+            else:
+                snooze = max([reclaim_at - now, 0])
+                log.info("Will reclaim task: %s run:%s in %s seconds",
+                         self.bbb_task.taskId, self.bbb_task.runId, snooze)
+                await asyncio.sleep(snooze)
 
 
-async def delete_task(task_id, request_id):
-    log.info("Cancelling task: %s", task_id)
-    await tc.cancel_task(task_id)
-    log.info("Removing from DB, task: %s, requestid: %s", task_id, request_id)
-    await db.delete_task_by_request_id(request_id)
+async def main_loop():
+    all_bbb_tasks = await db.fetch_all_tasks()
+
+    inactive_bbb_tasks = [t for t in all_bbb_tasks if t.takenUntil is None]
+    actionable_bbb_tasks = [t for t in all_bbb_tasks if t.takenUntil is not None]
+    actionable_request_ids = [bbb_task.buildrequestId for bbb_task in
+                              actionable_bbb_tasks]
+    finished_tasks = [rt for brid, rt in _reflected_tasks.iteritems() if
+                      brid not in actionable_request_ids]
+    new_bbb_tasks = [bbb_task for bbb_task in actionable_bbb_tasks if
+                     bbb_task.buildrequestId not in _reflected_tasks.keys()]
+
+    refresh_reflected_tasks(actionable_bbb_tasks)
+
+    await asyncio.wait([
+        add_new_tasks(new_bbb_tasks),
+        remove_finished_tasks(finished_tasks),
+        process_inactive_tasks(inactive_bbb_tasks),
+    ])
+
+
+def refresh_reflected_tasks(bbb_tasks):
+    """Refresh in-memory data
+    Assuming that we can run multiple instances of the reflector, update the
+    in-memory copies of the BBB tasks to avoid extra DB and TC calls to fetch
+    latest values, e.g. takenUntil.
+    """
+    for bbb_task in bbb_tasks:
+        if bbb_task.buildrequestId in _reflected_tasks.keys():
+            _reflected_tasks[bbb_task.buildrequestId].bbb_task = bbb_task
+
+
+async def add_new_tasks(new_bbb_tasks):
+    """Start reflecting a task"""
+    for bbb_task in new_bbb_tasks:
+        rt = ReflectedTask(bbb_task)
+        _reflected_tasks[bbb_task.buildrequestId] = rt
+        rt.start()
+
+
+async def remove_finished_tasks(finished__reflected_tasks):
+    """Stop reflecting finished tasks
+
+    After the BBListener removes a task from the database, the reflector
+    stops reclaiming the task.
+    """
+    async def cancel(reflected_task):
+        reflected_task.cancel()
+        del _reflected_tasks[reflected_task.bbb_task.buildrequestId]
+
+    await asyncio.wait([cancel(rt) for rt in finished__reflected_tasks])
 
 
 async def process_inactive_tasks(tasks):
-    """Process tasks with no `takenUntil` set."""
+    """Process tasks with no `takenUntil` set.
+
+    Cancel tasks when a buildrequest has been cancelled before starting.
+    Cancelling tasks that were running is handled by the BB listener.
+    """
+
+    async def delete_task(task_id, request_id):
+        log.info("Cancelling task: %s", task_id)
+        await tc.cancel_task(task_id)
+        log.info("Removing from DB, task: %s, requestid: %s", task_id,
+                 request_id)
+        await db.delete_task_by_request_id(request_id)
+
     request_ids = [t.buildrequestId for t in tasks]
     cancelled = await db.get_cancelled_build_requests(request_ids)
     cancelled_tasks = [t for t in tasks if t.buildRequestId in cancelled]
@@ -70,40 +135,3 @@ async def process_inactive_tasks(tasks):
             delete_task(task_id=t.taskId, request_id=t.buildRequestId)
             for t in cancelled_tasks
         ])
-
-
-class Reflector:
-    """The Reflector is responsible for two things:
-        1) Cancelling tasks when a buildrequest has been cancelled before starting
-           Cancelling tasks that were running is handled by the BB listener
-        2) Reclaiming active tasks
-    """
-    def __init__(self):
-        # Mapping of task id to a kind of future handle that is in charge of
-        # reclaiming this task
-        self.active_tasks = []
-
-    async def main_loop(self):
-        all_tasks = await db.fetch_all_tasks()
-        inactive_tasks = [t for t in all_tasks if t.takenUntil is None]
-        actionable = [t for t in all_tasks if t.takenUntil is not None]
-        finished_tasks = [t for t in self.active_tasks if t not in actionable]
-        new_tasks = [t for t in actionable if t not in self.active_tasks]
-        await asyncio.wait([
-            process_inactive_tasks(inactive_tasks),
-            self.remove_finished_tasks(finished_tasks),
-            self.add_new_tasks(new_tasks)
-        ])
-
-    async def remove_finished_tasks(self, finished_tasks):
-        async def cancel(t):
-            t.cancel()
-            self.active_tasks.remove(t)
-
-        await asyncio.wait([cancel(t) for t in finished_tasks])
-
-    async def add_new_tasks(self, new_tasks):
-        for t in new_tasks:
-            task = AsyncTask(t)
-            task.start()
-            self.active_tasks.append(task)

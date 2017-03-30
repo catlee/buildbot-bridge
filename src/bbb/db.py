@@ -58,7 +58,7 @@ async def get_branch(request_id):
         _bb_requests.c.id == request_id)
     res = await _bb_db.execute(q)
     records = await res.first()
-    return records[0]
+    return records[0].split("/")[-1]
 
 
 async def get_build_id(request_id):
