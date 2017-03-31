@@ -15,6 +15,7 @@ Why does this file exist, and why not put this in __main__?
   Also see (1) from http://click.pocoo.org/5/setuptools/#setuptools-integration
 """
 import asyncio
+import logging
 
 import click
 import yaml
@@ -29,6 +30,7 @@ import bbb.selfserve
 @click.option('--config', type=click.File('rb'), required=True,
               help='YAML Config file')
 def main(config):
+    logging.basicConfig(level=logging.INFO, format="%(name)s - %(message)s")
     cfg = yaml.safe_load(config)
 
     bbb.db.init(bridge_uri=cfg["bbb"]["uri"], buildbot_uri=cfg["bb"]["uri"])
