@@ -1,7 +1,7 @@
 import logging
 import aiohttp
-from . import DRY_RUN
 
+import bbb
 log = logging.getLogger(__name__)
 _api_root = None
 _session = None
@@ -31,7 +31,7 @@ async def _do_request(method, url):
 async def cancel_build(branch, build_id):
     url = "%s/build/%s" % (branch, build_id)
     log.info("Cancelling build: %s", url)
-    if DRY_RUN:
+    if bbb.DRY_RUN:
         log.info("DRY RUN: cancel_build(%s, %s)", branch, build_id)
         return
     await _do_request("DELETE", url)

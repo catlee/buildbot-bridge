@@ -3,9 +3,9 @@ import logging
 from taskcluster.async import Queue
 from taskcluster.async import TaskclusterRestFailure
 
+import bbb
 import bbb.db as db
 import bbb.selfserve as selfserve
-from . import DRY_RUN
 
 _queue = None
 log = logging.getLogger(__name__)
@@ -17,7 +17,7 @@ def init(options):
 
 
 async def reclaim_task(task_id, run_id, request_id):
-    if DRY_RUN:
+    if bbb.DRY_RUN:
         log.info("DRY RUN: reclaim_task(%s, %s, %s)", task_id, run_id,
                  request_id)
         return
