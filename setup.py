@@ -64,6 +64,7 @@ setup(
     install_requires=[
         'arrow',
         'click',
+        'pyYAML',
         'sqlalchemy',
         'sqlalchemy_aio',
         'taskcluster',
