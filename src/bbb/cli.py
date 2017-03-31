@@ -14,6 +14,8 @@ Why does this file exist, and why not put this in __main__?
 
   Also see (1) from http://click.pocoo.org/5/setuptools/#setuptools-integration
 """
+import asyncio
+
 import click
 import yaml
 
@@ -33,3 +35,6 @@ def main(config):
     bbb.taskcluster.init(
         options={"credentials": cfg["taskcluster"]["credentials"]})
     bbb.selfserve.init(cfg["selfserve"]["api_root"])
+    loop = asyncio.get_event_loop()
+    while True:
+        loop.run_until_complete(bbb.reflector.main_loop())
