@@ -68,6 +68,9 @@ async def reclaim_task(task_id, run_id, request_id):
 
 
 async def cancel_task(task_id):
+    if bbb.DRY_RUN:
+        log.info("DRY RUN: cancel_task(%s)", task_id)
+        return
     try:
         await _queue.cancelTask(task_id)
     except TaskclusterRestFailure as e:

@@ -7,7 +7,7 @@ import bbb.db as db
 import bbb.taskcluster as tc
 
 _reflected_tasks = dict()
-RECLAIM_THRESHOLD = 10 * 60
+RECLAIM_THRESHOLD = 5 * 60
 log = logging.getLogger(__name__)
 
 
@@ -119,6 +119,8 @@ async def remove_finished_tasks(finished_reflected_tasks):
         del _reflected_tasks[reflected_task.bbb_task.buildrequestId]
 
     if finished_reflected_tasks:
+        task_ids = [rt.bbb_task.taskId for rt in finished_reflected_tasks]
+        log.info("Remove finished tasks: %s", ", ".join(task_ids))
         await asyncio.wait([cancel(rt) for rt in finished_reflected_tasks])
 
 
