@@ -32,7 +32,8 @@ class ReflectedTask:
             now = arrow.now().timestamp
             taken_until = arrow.get(self.bbb_task.takenUntil).timestamp
             reclaim_at = taken_until - RECLAIM_THRESHOLD
-
+            log.debug("now: %s, taken_until: %s, reclaim_at: %s",
+                      now, taken_until, reclaim_at)
             if now >= reclaim_at:
                 log.info("Reclaim task: %s run:%s ", self.bbb_task.taskId,
                          self.bbb_task.runId)
