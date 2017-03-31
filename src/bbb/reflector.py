@@ -137,11 +137,11 @@ async def process_inactive_tasks(tasks):
 
     request_ids = [t.buildrequestId for t in tasks]
     cancelled = await db.get_cancelled_build_requests(request_ids)
-    cancelled_tasks = [t for t in tasks if t.buildRequestId in cancelled]
+    cancelled_tasks = [t for t in tasks if t.buildrequestId in cancelled]
     if cancelled_tasks:
         log.info("Found cancelled-before-started tasks: %s",
                  ", ".join(t.taskId for t in cancelled_tasks))
         await asyncio.wait([
-            delete_task(task_id=t.taskId, request_id=t.buildRequestId)
+            delete_task(task_id=t.taskId, request_id=t.buildrequestId)
             for t in cancelled_tasks
         ])
