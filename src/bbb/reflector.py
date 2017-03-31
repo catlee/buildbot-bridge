@@ -32,6 +32,7 @@ class ReflectedTask:
             now = arrow.now().timestamp
             taken_until = arrow.get(self.bbb_task.takenUntil).timestamp
             reclaim_at = taken_until - RECLAIM_THRESHOLD
+
             if now >= reclaim_at:
                 log.info("Reclaim task: %s run:%s ", self.bbb_task.taskId,
                          self.bbb_task.runId)
@@ -47,11 +48,11 @@ class ReflectedTask:
                     await db.update_taken_until(
                         self.bbb_task.buildrequestId,
                         arrow.get(res["takenUntil"]).timestamp)
-            else:
-                snooze = max([reclaim_at - now, 0])
-                log.info("Will reclaim task: %s run:%s in %s seconds",
-                         self.bbb_task.taskId, self.bbb_task.runId, snooze)
-                await asyncio.sleep(snooze)
+
+            snooze = max([reclaim_at - now, 0])
+            log.info("Will reclaim task: %s run:%s in %s seconds",
+                     self.bbb_task.taskId, self.bbb_task.runId, snooze)
+            await asyncio.sleep(snooze)
 
 
 async def main_loop(poll_interval):
