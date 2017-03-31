@@ -108,7 +108,7 @@ async def add_new_tasks(new_bbb_tasks):
         rt.start()
 
 
-async def remove_finished_tasks(finished__reflected_tasks):
+async def remove_finished_tasks(finished_reflected_tasks):
     """Stop reflecting finished tasks
 
     After the BBListener removes a task from the database, the reflector
@@ -118,7 +118,8 @@ async def remove_finished_tasks(finished__reflected_tasks):
         reflected_task.cancel()
         del _reflected_tasks[reflected_task.bbb_task.buildrequestId]
 
-    await asyncio.wait([cancel(rt) for rt in finished__reflected_tasks])
+    if finished_reflected_tasks:
+        await asyncio.wait([cancel(rt) for rt in finished_reflected_tasks])
 
 
 async def process_inactive_tasks(tasks):
