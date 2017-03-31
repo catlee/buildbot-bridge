@@ -11,11 +11,6 @@ RECLAIM_THRESHOLD = 10 * 60
 log = logging.getLogger(__name__)
 
 
-def parse_date(datestring):
-    """Parses ISO 8601 date string and returns a unix epoch time"""
-    return arrow.get(datestring).timestamp
-
-
 class ReflectedTask:
     def __init__(self, bbb_task):
         self.bbb_task = bbb_task
@@ -49,8 +44,9 @@ class ReflectedTask:
                     log.info("Update takenUntil of task: %s run:%s to %s",
                              self.bbb_task.taskId, self.bbb_task.runId,
                              res["takenUntil"])
-                    await db.update_taken_until(self.bbb_task.buildrequestId,
-                                                parse_date(res["takenUntil"]))
+                    await db.update_taken_until(
+                        self.bbb_task.buildrequestId,
+                        arrow.get(res["takenUntil"]).timestamp)
             else:
                 snooze = max([reclaim_at - now, 0])
                 log.info("Will reclaim task: %s run:%s in %s seconds",
@@ -59,16 +55,25 @@ class ReflectedTask:
 
 
 async def main_loop():
+    log.info("Fetching BBB tasks...")
     all_bbb_tasks = await db.fetch_all_tasks()
+    log.info("Total BBB tasks: %s", len(all_bbb_tasks))
 
     inactive_bbb_tasks = [t for t in all_bbb_tasks if t.takenUntil is None]
-    actionable_bbb_tasks = [t for t in all_bbb_tasks if t.takenUntil is not None]
+    log.info("BBB tasks without takenUntil set: %s", len(inactive_bbb_tasks))
+
+    actionable_bbb_tasks = [t for t in all_bbb_tasks
+                            if t.takenUntil is not None]
+    log.info("BBB tasks with takenUntil set: %s", len(actionable_bbb_tasks))
+
     actionable_request_ids = [bbb_task.buildrequestId for bbb_task in
                               actionable_bbb_tasks]
-    finished_tasks = [rt for brid, rt in _reflected_tasks.iteritems() if
-                      brid not in actionable_request_ids]
     new_bbb_tasks = [bbb_task for bbb_task in actionable_bbb_tasks if
                      bbb_task.buildrequestId not in _reflected_tasks.keys()]
+    log.info("New BBB tasks: %s", len(new_bbb_tasks))
+    finished_tasks = [rt for brid, rt in _reflected_tasks.items() if
+                      brid not in actionable_request_ids]
+    log.info("Finished BBB tasks: %s", len(finished_tasks))
 
     refresh_reflected_tasks(actionable_bbb_tasks)
 
