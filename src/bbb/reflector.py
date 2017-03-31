@@ -97,6 +97,7 @@ def refresh_reflected_tasks(bbb_tasks):
     """
     for bbb_task in bbb_tasks:
         if bbb_task.buildrequestId in _reflected_tasks.keys():
+            log.debug("Refreshing %s", bbb_task.taskId)
             _reflected_tasks[bbb_task.buildrequestId].bbb_task = bbb_task
 
 
