@@ -30,8 +30,9 @@ import bbb.selfserve
 @click.option('--config', type=click.File('rb'), required=True,
               help='YAML Config file')
 def main(config):
-    logging.basicConfig(level=logging.INFO, format="%(name)s - %(message)s")
+
     cfg = yaml.safe_load(config)
+    poll_interval = cfg["bbb"]["poll_interval"]
 
     bbb.db.init(bridge_uri=cfg["bbb"]["uri"], buildbot_uri=cfg["bb"]["uri"])
     bbb.taskcluster.init(
@@ -39,4 +40,4 @@ def main(config):
     bbb.selfserve.init(cfg["selfserve"]["api_root"])
     loop = asyncio.get_event_loop()
     while True:
-        loop.run_until_complete(bbb.reflector.main_loop())
+        loop.run_until_complete(bbb.reflector.main_loop(poll_interval))

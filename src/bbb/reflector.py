@@ -54,7 +54,7 @@ class ReflectedTask:
                 await asyncio.sleep(snooze)
 
 
-async def main_loop():
+async def main_loop(poll_interval):
     log.info("Fetching BBB tasks...")
     all_bbb_tasks = await db.fetch_all_tasks()
     log.info("Total BBB tasks: %s", len(all_bbb_tasks))
@@ -85,6 +85,7 @@ async def main_loop():
         remove_finished_tasks(finished_tasks),
         process_inactive_tasks(inactive_bbb_tasks),
     ])
+    await asyncio.sleep(poll_interval)
 
 
 def refresh_reflected_tasks(bbb_tasks):
