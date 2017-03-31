@@ -49,11 +49,13 @@ class ReflectedTask:
                     await db.update_taken_until(
                         self.bbb_task.buildrequestId,
                         arrow.get(res["takenUntil"]).timestamp)
-
-            snooze = max([reclaim_at - now, 0])
-            log.info("Will reclaim task: %s run:%s in %s seconds",
-                     self.bbb_task.taskId, self.bbb_task.runId, snooze)
-            await asyncio.sleep(snooze)
+                # sleep 10s just in case
+                await asyncio.sleep(10)
+            else:
+                snooze = max([reclaim_at - now, 0])
+                log.info("Will reclaim task: %s run:%s in %s seconds",
+                         self.bbb_task.taskId, self.bbb_task.runId, snooze)
+                await asyncio.sleep(snooze)
 
 
 async def main_loop(poll_interval):
