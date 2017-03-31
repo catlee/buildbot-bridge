@@ -75,9 +75,6 @@ async def main_loop(poll_interval):
                       brid not in actionable_request_ids]
     log.info("Finished BBB tasks: %s", len(finished_tasks))
 
-    # Dry run only for now.
-    return
-
     refresh_reflected_tasks(actionable_bbb_tasks)
 
     await asyncio.wait([

@@ -1,5 +1,8 @@
+import logging
 import sqlalchemy as sa
 from sqlalchemy_aio import ASYNCIO_STRATEGY
+
+from . import DRY_RUN
 
 _bbb_tasks = None
 _bb_requests = None
@@ -8,6 +11,8 @@ _bbb_db = None
 _bb_sourcestamps = None
 _bb_buildsets = None
 _bb_builds = None
+
+log = logging.getLogger(__name__)
 
 
 def init(bridge_uri, buildbot_uri):
@@ -26,6 +31,9 @@ def init(bridge_uri, buildbot_uri):
 
 
 async def delete_task_by_request_id(id_):
+    if DRY_RUN:
+        log.info("DRY RUN: delete_task_by_request_id(%s)", id_)
+        return
     await _bbb_db.execute(_bbb_tasks.delete(_bbb_tasks.c.buildrequestId == id_))
 
 
@@ -46,6 +54,10 @@ async def get_cancelled_build_requests(build_request_ids):
 
 
 async def update_taken_until(request_id, taken_until):
+    if DRY_RUN:
+        log.info("DRY RUN: update_taken_until(%s, %s)",
+                 request_id, taken_until)
+        return
     await _bbb_db.execute(
         _bbb_tasks.update(_bbb_tasks.c.buildrequestId == request_id).values(
             takenUntil=taken_until))

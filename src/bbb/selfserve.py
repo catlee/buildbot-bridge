@@ -1,15 +1,18 @@
 import logging
 import aiohttp
+from . import DRY_RUN
 
 log = logging.getLogger(__name__)
 _api_root = None
 _session = None
+_tcp_limit = 10
 
 
-def init(api_root):
-    global _api_root, _session
+def init(api_root, tcp_limit=_tcp_limit):
+    global _api_root, _session, _tcp_limit
     _api_root = api_root
-    conn = aiohttp.TCPConnector(limit=10)  # TODO:
+    _tcp_limit = tcp_limit
+    conn = aiohttp.TCPConnector(limit=_tcp_limit)
     _session = aiohttp.ClientSession(connector=conn)
 
 
@@ -25,7 +28,10 @@ async def _do_request(method, url):
     r.raise_for_status()
 
 
-async def cancel_build(branch, bild_id):
-    url = "%s/build/%s" % (branch, bild_id)
+async def cancel_build(branch, build_id):
+    url = "%s/build/%s" % (branch, build_id)
     log.info("Cancelling build: %s", url)
+    if DRY_RUN:
+        log.info("DRY RUN: cancel_build(%s, %s)", branch, build_id)
+        return
     await _do_request("DELETE", url)

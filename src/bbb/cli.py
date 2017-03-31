@@ -20,24 +20,32 @@ import logging
 import click
 import yaml
 
+import bbb
 import bbb.db
-import bbb.taskcluster
 import bbb.reflector
 import bbb.selfserve
+import bbb.taskcluster
 
 
 @click.command()
 @click.option('--config', type=click.File('rb'), required=True,
               help='YAML Config file')
 def main(config):
-
     cfg = yaml.safe_load(config)
-    poll_interval = cfg["bbb"]["poll_interval"]
+    if cfg["bbb"].get("dry-run"):
+        bbb.DRY_RUN = True
+
+    log_level = logging.INFO
+    if cfg["bbb"].get("verbose"):
+        log_level = logging.DEBUG
+    logging.basicConfig(level=log_level, format="%(name)s - %(message)s")
 
     bbb.db.init(bridge_uri=cfg["bbb"]["uri"], buildbot_uri=cfg["bb"]["uri"])
     bbb.taskcluster.init(
         options={"credentials": cfg["taskcluster"]["credentials"]})
     bbb.selfserve.init(cfg["selfserve"]["api_root"])
+
     loop = asyncio.get_event_loop()
     while True:
-        loop.run_until_complete(bbb.reflector.main_loop(poll_interval))
+        loop.run_until_complete(bbb.reflector.main_loop(
+            cfg["bbb"]["poll_interval"]))
