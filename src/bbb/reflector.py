@@ -12,6 +12,8 @@ log = logging.getLogger(__name__)
 
 
 class ReflectedTask:
+    loop = asyncio.get_event_loop()
+
     def __init__(self, bbb_task):
         self.bbb_task = bbb_task
         self.future = None
@@ -19,43 +21,58 @@ class ReflectedTask:
     def start(self):
         log.info("Start watching task: %s run: %s", self.bbb_task.taskId,
                  self.bbb_task.runId)
-        loop = asyncio.get_event_loop()
-        self.future = loop.create_task(self.reclaim_loop())
+        self.future = self.loop.create_task(self.reclaim_loop())
 
     def cancel(self):
         log.info("Stop watching task: %s run: %s", self.bbb_task.taskId,
                  self.bbb_task.runId)
         self.future.cancel()
 
+    @property
+    def reclaim_at(self):
+        taken_until = arrow.get(self.bbb_task.takenUntil).timestamp
+        reclaim_at = taken_until - RECLAIM_THRESHOLD
+        return reclaim_at
+
+    @property
+    def should_reclaim(self):
+        now = arrow.now().timestamp
+        return now >= self.reclaim_at
+
+    @property
+    def snooze_time(self):
+        now = arrow.now().timestamp
+        snooze = max([self.reclaim_at - now, 0])
+        return snooze
+
+    async def snooze(self):
+        snooze = self.snooze_time
+        log.info("Will reclaim task: %s run:%s in %s seconds",
+                 self.bbb_task.taskId, self.bbb_task.runId, snooze)
+        await asyncio.sleep(snooze)
+
+    async def reclaim_task(self):
+        log.info("Reclaim task: %s run:%s ", self.bbb_task.taskId,
+                 self.bbb_task.runId)
+        res = await tc.reclaim_task(
+            self.bbb_task.taskId,
+            int(self.bbb_task.runId),
+            self.bbb_task.buildrequestId)
+        if res:
+            self.bbb_task.takenUntil = res["takenUntil"]
+            log.info("Update takenUntil of task: %s run:%s to %s",
+                     self.bbb_task.taskId, self.bbb_task.runId,
+                     res["takenUntil"])
+            await db.update_taken_until(
+                self.bbb_task.buildrequestId,
+                arrow.get(res["takenUntil"]).timestamp)
+
     async def reclaim_loop(self):
         while True:
-            now = arrow.now().timestamp
-            taken_until = arrow.get(self.bbb_task.takenUntil).timestamp
-            reclaim_at = taken_until - RECLAIM_THRESHOLD
-            log.debug("now: %s, taken_until: %s, reclaim_at: %s",
-                      now, taken_until, reclaim_at)
-            if now >= reclaim_at:
-                log.info("Reclaim task: %s run:%s ", self.bbb_task.taskId,
-                         self.bbb_task.runId)
-                res = await tc.reclaim_task(
-                    self.bbb_task.taskId,
-                    int(self.bbb_task.runId),
-                    self.bbb_task.buildrequestId)
-                if res:
-                    self.bbb_task.takenUntil = res["takenUntil"]
-                    log.info("Update takenUntil of task: %s run:%s to %s",
-                             self.bbb_task.taskId, self.bbb_task.runId,
-                             res["takenUntil"])
-                    await db.update_taken_until(
-                        self.bbb_task.buildrequestId,
-                        arrow.get(res["takenUntil"]).timestamp)
-                # sleep 10s just in case
-                await asyncio.sleep(10)
-            else:
-                snooze = max([reclaim_at - now, 0])
-                log.info("Will reclaim task: %s run:%s in %s seconds",
-                         self.bbb_task.taskId, self.bbb_task.runId, snooze)
-                await asyncio.sleep(snooze)
+            # TODO: Error handling here
+            if self.should_reclaim:
+                await self.reclaim_task()
+            await self.snooze()
 
 
 async def main_loop(poll_interval):
