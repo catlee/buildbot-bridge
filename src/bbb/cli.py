@@ -26,19 +26,23 @@ import bbb.reflector
 import bbb.selfserve
 import bbb.taskcluster
 
+log = logging.getLogger(__name__)
+
 
 @click.command()
 @click.option('--config', type=click.File('rb'), required=True,
               help='YAML Config file')
 def main(config):
     cfg = yaml.safe_load(config)
-    if cfg["bbb"].get("dry-run"):
-        bbb.DRY_RUN = True
 
     log_level = logging.INFO
     if cfg["bbb"].get("verbose"):
         log_level = logging.DEBUG
     logging.basicConfig(level=log_level, format="%(name)s - %(message)s")
+
+    if cfg["bbb"].get("dry-run"):
+        log.info("DRY RUN MODE")
+        bbb.DRY_RUN = True
 
     bbb.db.init(bridge_uri=cfg["bbb"]["uri"], buildbot_uri=cfg["bb"]["uri"])
     bbb.taskcluster.init(
