@@ -44,5 +44,5 @@ def test_should_reclaim():
         now.return_value.timestamp = 1490997300
         assert t.should_reclaim
 
-        now.return_value.timestamp = 1490997000 - 1
+        now.return_value.timestamp = 1490997300 - 1
         assert not t.should_reclaim
