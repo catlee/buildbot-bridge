@@ -18,63 +18,59 @@ class BBB_Task:
         self.buildrequestId = buildrequestId
 
 
+@pytest.fixture
+def rt():
+    bbb_task = BBB_Task(takenUntil='2017-03-31 22:00:00Z')
+    rt = ReflectedTask(bbb_task)
+    return rt
+
+
 @pytest.mark.asyncio
-async def test_start_and_cancel_task(event_loop):
-    bbb_task = BBB_Task()
+async def test_start_and_cancel_task(event_loop, rt):
+    rt.loop = event_loop
+    rt.start()
 
-    t = ReflectedTask(bbb_task)
-    t.loop = event_loop
-    t.start()
-
-    assert t.future
-    assert not t.future.cancelled()
-    assert not t.future.done()
+    assert rt.future
+    assert not rt.future.cancelled()
+    assert not rt.future.done()
 
     with pytest.raises(CancelledError), mock.patch('bbb.taskcluster.reclaim_task'):
-        t.cancel()
-        await t.future
-    assert t.future.cancelled()
-    assert t.future.done()
+        rt.cancel()
+        await rt.future
+    assert rt.future.cancelled()
+    assert rt.future.done()
 
 
-def test_reclaim_at():
-    bbb_task = BBB_Task(takenUntil='2017-03-31 22:00:00Z')
-    t = ReflectedTask(bbb_task)
-    assert t.reclaim_at == 1490997300
+def test_reclaim_at(rt):
+    assert rt.reclaim_at == 1490997300
 
 
-def test_should_reclaim():
-    bbb_task = BBB_Task(takenUntil='2017-03-31 22:00:00Z')
-    t = ReflectedTask(bbb_task)
+def test_should_reclaim(rt):
     with mock.patch('arrow.now') as now:
         now.return_value.timestamp = 1490997300
-        assert t.should_reclaim
+        assert rt.should_reclaim
 
         now.return_value.timestamp = 1490997300 - 1
-        assert not t.should_reclaim
+        assert not rt.should_reclaim
 
-def test_snooze_time():
-    bbb_task = BBB_Task(takenUntil='2017-03-31 22:00:00Z')
-    t = ReflectedTask(bbb_task)
-    assert t.reclaim_at == 1490997300
+def test_snooze_time(rt):
+    assert rt.reclaim_at == 1490997300
 
     with mock.patch('arrow.now') as now:
         now.return_value.timestamp = 1490997300
-        assert t.snooze_time == 0
+        assert rt.snooze_time == 0
 
         now.return_value.timestamp = 1490997300 - 10
-        assert t.snooze_time == 10
+        assert rt.snooze_time == 10
 
         now.return_value.timestamp = 1490997300 + 10
-        assert t.snooze_time == 0
+        assert rt.snooze_time == 0
 
 @pytest.mark.asyncio
-async def test_snooze():
-    bbb_task = BBB_Task(takenUntil='2017-03-31 22:00:00Z')
-    t = ReflectedTask(bbb_task)
+async def test_snooze(rt):
     with mock.patch('arrow.now') as now, mock.patch('asyncio.sleep', new_callable=AsyncMock) as sleep:
         now.return_value.timestamp = 1490997300 - 10
-        assert t.snooze_time == 10
+        assert rt.snooze_time == 10
 
-        await t.snooze()
+        await rt.snooze()
         assert sleep.called_with(10)
