@@ -35,15 +35,15 @@ async def test_start_and_cancel_task(event_loop):
 def test_reclaim_at():
     bbb_task = BBB_Task(takenUntil='2017-03-31 22:00:00Z')
     t = ReflectedTask(bbb_task)
-    assert t.reclaim_at == 1490997000
+    assert t.reclaim_at == 1490997300
 
 
 def test_should_reclaim():
     bbb_task = BBB_Task(takenUntil='2017-03-31 22:00:00Z')
     t = ReflectedTask(bbb_task)
     with mock.patch('arrow.now') as now:
-        now.return_value.timestamp = 1490997000
+        now.return_value.timestamp = 1490997300
         assert t.should_reclaim
 
-        now.return_value.timestamp = 1490997000 - 1
+        now.return_value.timestamp = 1490997300 - 1
         assert not t.should_reclaim
