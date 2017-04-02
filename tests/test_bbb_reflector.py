@@ -1,4 +1,6 @@
 from concurrent.futures import CancelledError
+from unittest import mock
+import pytest
 
 from bbb.reflector import ReflectedTask
 
@@ -41,8 +43,10 @@ async def test_start_and_cancel_task(event_loop, rt):
     assert rt.future.done()
 
 
-def test_reclaim_at(rt):
-    assert rt.reclaim_at == 1490997300
+def test_reclaim_at():
+    bbb_task = BBB_Task(takenUntil='2017-03-31 22:00:00Z')
+    t = ReflectedTask(bbb_task)
+    assert t.reclaim_at == 1490997300
 
 
 def test_should_reclaim(rt):
