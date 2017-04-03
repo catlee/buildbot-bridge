@@ -1,11 +1,10 @@
 from concurrent.futures import CancelledError
 from unittest import mock
+
 import pytest
 
 from bbb.reflector import ReflectedTask
 
-import pytest
-from unittest import mock
 
 class AsyncMock(mock.MagicMock):
     async def __call__(self, *args, **kwargs):
