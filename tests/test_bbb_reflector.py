@@ -21,7 +21,7 @@ class BBB_Task:
 
 @pytest.fixture
 def rt():
-    bbb_task = BBB_Task(takenUntil='2017-03-31 22:00:00Z')
+    bbb_task = BBB_Task(takenUntil='2017-03-31 22:00:00Z', runId=0, taskId='12345abcde')
     rt = ReflectedTask(bbb_task)
     return rt
 
@@ -77,3 +77,17 @@ async def test_snooze(rt):
 
         await rt.snooze()
         assert sleep.called_with(10)
+
+@pytest.mark.asyncio
+async def test_reclaim_task(rt):
+    with mock.patch('bbb.taskcluster.reclaim_task', new_callable=AsyncMock) as reclaim_task:
+        reclaim_task.return_value = {'takenUntil': '2017-03-31 22:20:00Z'}
+        await rt.reclaim_task()
+        assert rt.bbb_task.takenUntil == '2017-03-31 22:20:00Z'
+
+@pytest.mark.asyncio
+async def test_reclaim_task_noop(rt):
+    with mock.patch('bbb.taskcluster.reclaim_task', new_callable=AsyncMock) as reclaim_task:
+        reclaim_task.return_value = {}
+        await rt.reclaim_task()
+        assert rt.bbb_task.takenUntil == '2017-03-31 22:00:00Z'
