@@ -184,6 +184,11 @@ class BuildbotDb(object):
         self.sourcestamps_table = metadata.tables["sourcestamps"]
         self.buildset_properties_table = metadata.tables["buildset_properties"]
         self.buildsets_table = metadata.tables["buildsets"]
+        self.changes_table = metadata.tables["changes"]
+        self.changefiles_table = metadata.tables["change_files"]
+        self.changelinks_table = metadata.tables["change_links"]
+        self.changeproperties_table = metadata.tables["change_properties"]
+        self.sourcestampchanges_table = metadata.tables["sourcestamp_changes"]
 
     @statsd.timer('bbdb.getBuildRequest')
     def getBuildRequest(self, brid):
@@ -235,7 +240,55 @@ class BuildbotDb(object):
         ssid = r.lastrowid
         log.info("Created sourcestamp %s", ssid)
 
-        # TODO: Create change objects, files, etc.
+        # Create change objects, files, etc.
+        for change in sourcestamp.get('changes', []):
+            q = self.changes_table.insert().values(
+                author=change['who'],
+                comments=change['comments'],
+                is_dir=change.get('is_dir', False),
+                branch=change['branch'],
+                revision=change.get('revision'),
+                revlink=change.get('revlink'),
+                when_timestamp=change['when'],
+                category=change.get('category'),
+                repository=change['repository'],
+                project=change['project'],
+            )
+            r = self.db.execute(q)
+            changeid = r.lastrowid
+
+            # Add files
+            for f in change.get('files', []):
+                url = f.get('url')
+                name = f.get('name')
+                if name:
+                    q = self.changefiles_table.insert().values(
+                        changeid=changeid,
+                        filename=name)
+                    self.db.execute(q)
+                if url:
+                    q = self.changelinks_table.insert().values(
+                        changeid=changeid,
+                        link=url)
+                    self.db.execute(q)
+
+            # Add properties
+            for propname, propvalue, propsource in change.get('properties', []):
+                q = self.changeproperties_table.insert().values(
+                    changeid=changeid,
+                    property_name=propname,
+                    property_value=propvalue,
+                    # TODO: what happens to propsource? where does it come from in BB?
+                )
+                self.db.execute(q)
+
+            # Add to sourcestamp_changes
+            q = self.sourcestampchanges_table.insert().values(
+                sourcestampid=ssid,
+                changeid=changeid,
+            )
+            self.db.execute(q)
+
         return ssid
 
     @statsd.timer('bbdb.createBuildSetProperties')

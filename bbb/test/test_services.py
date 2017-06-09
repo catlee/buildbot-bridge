@@ -715,6 +715,87 @@ SELECT * FROM buildsets;"""))
             self.assertEqual(reason, u'Created by BBB for task ')
 
     @patch("arrow.now")
+    def testHandlePendingNewTaskWithChanges(self, fake_now):
+        taskid = makeTaskId()
+        data = {"status": {
+            "taskId": taskid,
+            "runs": [
+                {"runId": 0},
+            ],
+        }}
+
+        processed_date = fake_now.return_value = arrow.Arrow(2015, 4, 1)
+        self.tclistener.tc_queue.task.return_value = {
+            "created": 50,
+            "payload": {
+                "buildername": "builder good name",
+                "properties": {
+                    "product": "foo",
+                },
+                "sourcestamp": {
+                    "branch": "http://foo.com/blah",
+                    "changes": [{
+                        "category": "",
+                        "files": [
+                            {"url": "http://url", "name": "filename"},
+                        ],
+                        "repository": "repo",
+                        "when": 12345,
+                        "who": "me",
+                        "comments": "my commit",
+                        "branch": "branchname",
+                        "project": "my project",
+                        "properties": [
+                            ('propname', 'propvalue', 'propsource'),
+                        ],
+                    }],
+                },
+            },
+        }
+        self.tclistener.handlePending(data, Mock())
+
+        self.assertEqual(self.tclistener.tc_queue.task.call_count, 1)
+        bbb_state = self.tasks.select().execute().fetchall()
+        self.assertEqual(len(bbb_state), 1)
+        self.assertEqual(bbb_state[0].buildrequestId, 1)
+        self.assertEqual(bbb_state[0].taskId, taskid)
+        self.assertEqual(bbb_state[0].runId, 0)
+        self.assertEqual(bbb_state[0].createdDate, 50)
+        self.assertEqual(bbb_state[0].processedDate, processed_date.timestamp)
+        self.assertEqual(bbb_state[0].takenUntil, None)
+
+        buildrequests = self.tclistener.buildbot_db.buildrequests_table.select().execute().fetchall()
+        self.assertEqual(buildrequests[0].id, 1)
+        self.assertEqual(buildrequests[0].buildername, "builder good name")
+        self.assertEqual(buildrequests[0].priority, 0)
+        properties = self.tclistener.buildbot_db.buildset_properties_table.select().execute().fetchall()
+        self.assertItemsEqual(properties, [
+            (1, u"taskId", u'["{}", "bbb"]'.format(taskid)),
+            (1, u"product", u'["foo", "bbb"]'),
+        ])
+        changes = self.tclistener.buildbot_db.changes_table.select().execute().fetchall()
+        self.assertEqual(changes[0].comments, "my commit")
+        self.assertEqual(changes[0].repository, "repo")
+
+        files = self.tclistener.buildbot_db.changefiles_table.select().execute().fetchall()
+        self.assertItemsEqual(files, [
+            (changes[0].changeid, 'filename')
+        ])
+
+        properties = self.tclistener.buildbot_db.changeproperties_table.select().execute().fetchall()
+        self.assertItemsEqual(properties, [
+            (changes[0].changeid, 'propname', 'propvalue'),
+        ])
+
+        # This assertion is important because the reason field
+        # is used by TH for backfilling bbb jobs
+        bb_state = self.buildbot_db.execute(sa.text("""
+SELECT * FROM buildsets;"""))
+        for row in bb_state:
+            reason = row[2][0:-len(taskid)]
+            self.assertEqual(reason, u'Created by BBB for task ')
+
+    @patch("arrow.now")
     def testHandlePendingNotAuthorizedRestrictedBuilder(self, fake_now):
         taskid = makeTaskId()
         data = {"status": {

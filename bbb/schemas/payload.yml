@@ -52,6 +52,10 @@ properties:
                 description: SourceStamp project. Generally unused.
                 type:        string
                 minLength:   1
+            changes:
+                title:       Changes
+                description: List of changes
+                type:        array
     properties:
         title:       Buildbot Properties
         description: |
